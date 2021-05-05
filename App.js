@@ -1,4 +1,7 @@
 /* 
+REPLACE BUTTONS WITH TOUCHABLEOPACITY SO YOU CAN STYLE THEM
+
+
 -------------INSTRUCTIONS----------------
 Une application météo, avec les fonctionnalités suivant
 
@@ -12,24 +15,119 @@ Une page favoris : liste des favoris
 - this gets forecast of your *current* location. needs to search it(?)
 - also code to get forecasts of other times, but unformatted (use flatlist?)
 - need to add: pagination, search, custom locations, display correct information
+- hesitant to introduce stack navigator because of number of parametres which would be required to pass
+- work out static storage
 */
 
 
 
 //-----------DEPENDENCIES AND CONFIG---------------
+import 'react-native-gesture-handler'; //navigation
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Image, ActivityIndicator, SafeAreaView, ScrollView, Alert, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, Image, Button, FlatList, ActivityIndicator, SafeAreaView, ScrollView, Alert, RefreshControl, StatusBar, PermissionsAndroid, TextInput, ViewStyle, TextStyle, TextInputProps } from 'react-native';
 import * as Location from 'expo-location';
 
+//pagination
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+
+//open weather key config
 const openWeatherKey = `fe5274e1e1f6d5ccddc365d41c0e1a6a`; //the key to connext to the open web service
 let url = `https://api.openweathermap.org/data/2.5/onecall?&units=metric&exclude=minutely&appid=${openWeatherKey}`;
 
+//form - search bar
+import { FieldError } from 'react-hook-form';
+
+//-----------NAVIGATION---------------
+
+const Stack = createStackNavigator();
+
+function App({ navigation }) {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="index">
+        <Stack.Screen name="index" component={index} />
+        <Stack.Screen name="search" component={search} />
+        <Stack.Screen name="faves" component={faves} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
 
 
+//-----------PERMISSIONS---------------
 
-//-----------LOAD VISUALS & FORECAST---------------
+const requestLocationPermission = async () => {
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      {
+        title: "Simple weather app needs to use your location",
+        message:
+          "We need to access your location so we can display your local weather.",
+        buttonNeutral: "Ask Me Later",
+        buttonNegative: "Cancel",
+        buttonPositive: "OK"
+      }
+    );
+    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+      console.log("You can use my location");
+    } else {
+      console.log("Location permission denied");
+    }
+  } catch (err) {
+    console.warn(err);
+  }
+};
 
-const App = () => {
+/* this method doesn't work with expo
+const granted = await PermissionsAndroid.request(
+  PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  {
+    'title': 'Simple weather app needs to use your location',
+    'message': 'We need to access your location so we can display your local weather.'
+  }
+)
+*/
+
+
+//-----------WEATHER LOADING PAGE---------------
+
+const faves = ({ navigation }) => {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.navbar}>
+      <Button style={styles.navbuttonselected} onPress={() => navigation.navigate('index')} title="index" />
+        <Button style={styles.navbutton}  title="Search" onPress={() => navigation.navigate('search')}/>
+        <Button  style={styles.navbutton} onPress={()=>console.log("you are already here")}  title="Favourites"  />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+
+const search = ({ navigation }) => {
+  //add event listeners? i think?
+  const [text, onChangeText] = React.useState("");
+  
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.navbar}>
+      <Button style={styles.navbuttonselected} onPress={() => navigation.navigate('index')} title="index" />
+        <Button style={styles.navbutton}  title="Search" onPress={()=>console.log("you are already here")}/>
+        <Button  style={styles.navbutton} onPress={() => navigation.navigate('faves')} title="Favourites" />
+      </View>
+      <TextInput
+        onChangeText={onChangeText}
+        value={text}
+        style={styles.input}
+      />
+    </SafeAreaView>
+  );
+}
+
+
+const index = ({ navigation }) => {
 
   //these are hooks
   //they let you use and state react features without writing a class
@@ -42,6 +140,7 @@ const App = () => {
 
     const { status } = await Location.requestPermissionsAsync(); //get user's location
     if (status !== 'granted') { //if it's not granted...
+      requestLocationPermission;
       Alert.alert('Location could not be accessed. Check permissions.');
     }
 
@@ -57,14 +156,13 @@ const App = () => {
     }
 
     setRefreshing(false); //once you've got the indfo, can stop refreshing
-  }
+  };
 
   useEffect(() => {
     if (!forecast) {
       loadForecast(); //get the forecast!!
     }
-  })
-
+  });
 
   //this loads the loading screen while the async stuff operates
   if (!forecast) {
@@ -77,6 +175,11 @@ const App = () => {
   const current = forecast.current.weather[0];
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.navbar}>
+      <Button style={styles.navbuttonselected} onPress={()=>console.log("you are already here")} title="index" />
+        <Button style={styles.navbutton} onPress={() => navigation.navigate('search')} title="Search" />
+        <Button  style={styles.navbutton} onPress={() => navigation.navigate('faves')} title="Favourites" />
+      </View>
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -84,7 +187,7 @@ const App = () => {
             refreshing={refreshing}
           />}
       >
-        <Text style={styles.title}>Weather Forecast App</Text>
+        <Text style={styles.title}>Current Weather</Text>
         <View style={styles.current}>
           <Image
             style={styles.largeIcon}
@@ -96,12 +199,51 @@ const App = () => {
         </View>
 
         <Text style={styles.currentDescription}>{current.description}</Text>
+        <View>
+          <Text style={styles.subtitle}>Hourly Forecast</Text>
+          <FlatList horizontal
+            data={forecast.hourly.slice(0, 24)}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={(hour) => {
+              const weather = hour.item.weather[0];
+              var dt = new Date(hour.item.dt * 1000);
+              return <View style={styles.hour}>
+                <Text>{dt.toLocaleTimeString().replace(/:\d+ /, ' ')}</Text>
+                <Text>{Math.round(hour.item.temp)}°C</Text>
+                <Image
+                  style={styles.smallIcon}
+                  source={{
+                    uri: `http://openweathermap.org/img/wn/${weather.icon}@4x.png`,
+                  }}
+                />
+                <Text>{weather.description}</Text>
+              </View>
+            }}
+          />
+        </View>
 
+        <Text style={styles.subtitle}>Next 5 Days</Text>
+        {forecast.daily.slice(0, 5).map(d => { //Only want the next 5 days
+          const weather = d.weather[0];
+          var dt = new Date(d.dt * 1000);
+          return <View style={styles.day} key={d.dt}>
+            <Text style={styles.dayTemp}>{Math.round(d.temp.max)}°C</Text>
+            <Image
+              style={styles.smallIcon}
+              source={{
+                uri: `http://openweathermap.org/img/wn/${weather.icon}@4x.png`,
+              }}
+            />
+            <View style={styles.dayDetails}>
+              <Text>{dt.toLocaleDateString()}</Text>
+              <Text>{weather.description}</Text>
+            </View>
+          </View>
+        })}
       </ScrollView>
     </SafeAreaView>
   );
 }
-
 
 
 //-----------STYLE---------------
@@ -112,39 +254,36 @@ const styles = StyleSheet.create({
     fontSize: 42,
     color: '#e491ff',
     fontWeight: 'bold',
-    textTransform: 'uppercase',
-    marginTop: "2.5vh",
+    textTransform: 'uppercase'
   },
   subtitle: {
     fontSize: 24,
     marginVertical: 12,
     marginLeft: 4,
-    color: '#e491ff',
+    color: '#e491ff'
   },
   container: {
     flex: 1,
-    backgroundColor: '#39353b',
-    alignItems: 'center',
+    flexDirection: 'column',
     justifyContent: 'flex-start',
+    backgroundColor: '#39353b'
   },
   loading: {
     flex: 1,
     backgroundColor: '#39353b',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   current: {
-    flexDirection: 'row',
     alignItems: 'center',
     alignContent: 'center',
     backgroundColor: '#913f5a',
-    margin: '2vh',
-    borderRadius: '25px',
+    padding: 10
   },
   currentTemp: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#ffffff',
     textAlign: 'center',
   },
   currentDescription: {
@@ -157,27 +296,49 @@ const styles = StyleSheet.create({
   },
   hour: {
     padding: 6,
-    alignItems: 'center',
+    flexDirection: 'row',
+    backgroundColor: '#fff'
   },
   day: {
+    backgroundColor: '#fff',
     flexDirection: 'row',
+    alignItems: 'center'
   },
   dayDetails: {
-    justifyContent: 'center',
+    alignItems: 'center',
+    alignContent: 'center'
   },
   dayTemp: {
     marginLeft: 12,
     alignSelf: 'center',
     fontSize: 20,
-    color: '#d18ccc',
+    color: '#d18ccc'
   },
   largeIcon: {
     width: 250,
-    height: 200,
+    height: 100
   },
   smallIcon: {
     width: 100,
-    height: 100,
+    height: 100
+  },
+  input:{
+    backgroundColor: '#fff',
+    margin: 20,
+    height: 30,
+    padding: 5,
+    borderWidth: 1
+  },
+  navbar:{
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  navbutton:{
+    width:'33%',
+  },
+  navbuttonselected:{
+    width:'33%',
+    backgroundColor: '#000'
   }
 });
 
