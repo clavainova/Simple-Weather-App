@@ -12,19 +12,20 @@ Une page favoris : liste des favoris
 
 
 -------------TO DO LIST----------------
+- REPLACE BUTTONS WITH TOUCHABLEOPACITY SO YOU CAN STYLE THEM
 - this gets forecast of your *current* location. needs to search it(?)
-- also code to get forecasts of other times, but unformatted (use flatlist?)
-- need to add: pagination, search, custom locations, display correct information
-- hesitant to introduce stack navigator because of number of parametres which would be required to pass
+- need to add: search, custom locations, display correct information
 - work out static storage
 */
 
 
 
 //-----------DEPENDENCIES AND CONFIG---------------
+
+
 import 'react-native-gesture-handler'; //navigation
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Image, Button, FlatList, ActivityIndicator, SafeAreaView, ScrollView, Alert, RefreshControl, StatusBar, PermissionsAndroid, TextInput, ViewStyle, TextStyle, TextInputProps } from 'react-native';
+import { StyleSheet, Text, View, Image, ImageBackground, Button, FlatList, ActivityIndicator, SafeAreaView, ScrollView, Alert, RefreshControl, StatusBar, PermissionsAndroid, TextInput, ViewStyle, TextStyle, TextInputProps } from 'react-native';
 import * as Location from 'expo-location';
 
 //pagination
@@ -38,7 +39,15 @@ let url = `https://api.openweathermap.org/data/2.5/onecall?&units=metric&exclude
 //form - search bar
 import { FieldError } from 'react-hook-form';
 
-//-----------NAVIGATION---------------
+//storage
+import create from "zustand";
+import { persist } from "zustand/middleware";
+import AsyncStorage from 'react-native';
+
+const image = { uri: "https://i.pinimg.com/originals/b8/0e/9f/b80e9fb1bc10d0c3f1aed0929152576f.png" };
+
+//-----------NAVIGATION/APP---------------
+
 
 const Stack = createStackNavigator();
 
@@ -91,16 +100,44 @@ const granted = await PermissionsAndroid.request(
 */
 
 
-//-----------WEATHER LOADING PAGE---------------
+//-----------STORAGE---------------
+
+/* Sample data structure:
+        {
+          id: 0,
+          city: "Oloron",
+          longitude: "0",
+          latitude: 0
+        },
+*/
+
+
+//storage object
+const storeIt = create(
+  persist(
+    (set, get) => ({
+      favesArr: [],
+      addFave: (item) => set((state) => ({ favesArr: [state.favesArr, item] })), //think need a return in here
+      delFave: (prop) => set(() => ({ favesArr: [prop] })),
+    }),
+    {
+      name: "favourites",
+      getStorage: () => AsyncStorage
+    }));
+
+
+//-----------COMPONENTS---------------
 
 const faves = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.navbar}>
-      <Button style={styles.navbuttonselected} onPress={() => navigation.navigate('index')} title="index" />
-        <Button style={styles.navbutton}  title="Search" onPress={() => navigation.navigate('search')}/>
-        <Button  style={styles.navbutton} onPress={()=>console.log("you are already here")}  title="Favourites"  />
+        <Button style={styles.navbuttonselected} onPress={() => navigation.navigate('index')} title="index" />
+        <Button style={styles.navbutton} title="Search" onPress={() => navigation.navigate('search')} />
+        <Button style={styles.navbutton} onPress={() => console.log("you are already here")} title="Favourites" />
       </View>
+      <ImageBackground source={image} style={styles.image}>
+      </ImageBackground>
     </SafeAreaView>
   );
 }
@@ -109,19 +146,21 @@ const faves = ({ navigation }) => {
 const search = ({ navigation }) => {
   //add event listeners? i think?
   const [text, onChangeText] = React.useState("");
-  
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.navbar}>
-      <Button style={styles.navbuttonselected} onPress={() => navigation.navigate('index')} title="index" />
-        <Button style={styles.navbutton}  title="Search" onPress={()=>console.log("you are already here")}/>
-        <Button  style={styles.navbutton} onPress={() => navigation.navigate('faves')} title="Favourites" />
-      </View>
-      <TextInput
+        <Button style={styles.navbuttonselected} onPress={() => navigation.navigate('index')} title="index" />
+        <Button style={styles.navbutton} title="Search" onPress={() => console.log("you are already here")} />
+        <Button style={styles.navbutton} onPress={() => navigation.navigate('faves')} title="Favourites" />
+      </View><TextInput
         onChangeText={onChangeText}
         value={text}
         style={styles.input}
       />
+      <ImageBackground source={image} style={styles.image}>
+      </ImageBackground>
+
     </SafeAreaView>
   );
 }
@@ -176,31 +215,31 @@ const index = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.navbar}>
-      <Button style={styles.navbuttonselected} onPress={()=>console.log("you are already here")} title="index" />
+        <Button style={styles.navbuttonselected} onPress={() => console.log("you are already here")} title="index" />
         <Button style={styles.navbutton} onPress={() => navigation.navigate('search')} title="Search" />
-        <Button  style={styles.navbutton} onPress={() => navigation.navigate('faves')} title="Favourites" />
+        <Button style={styles.navbutton} onPress={() => navigation.navigate('faves')} title="Favourites" />
       </View>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            onRefresh={() => { loadForecast() }}
-            refreshing={refreshing}
-          />}
-      >
-        <Text style={styles.title}>Current Weather</Text>
-        <View style={styles.current}>
-          <Image
-            style={styles.largeIcon}
-            source={{
-              uri: `http://openweathermap.org/img/wn/${current.icon}@4x.png`,
-            }}
-          />
-          <Text style={styles.currentTemp}>{Math.round(forecast.current.temp)}°C</Text>
-        </View>
+      <ScrollView refreshControl={<RefreshControl onRefresh={() => { loadForecast() }} refreshing={refreshing} />} >
+        <Text style={styles.title}>Weather</Text>
+
+        <ImageBackground source={image} style={styles.image}>
+          <View style={styles.current}>
+            <Image
+              style={styles.largeIcon}
+              source={{
+                uri: `http://openweathermap.org/img/wn/${current.icon}@4x.png`,
+              }}
+            />
+            <Text style={styles.currentTemp}>{Math.round(forecast.current.temp)}°C</Text>
+          </View>
+        </ImageBackground>
 
         <Text style={styles.currentDescription}>{current.description}</Text>
+
         <View>
-          <Text style={styles.subtitle}>Hourly Forecast</Text>
+          <ImageBackground source={image} style={styles.image}>
+            <Text style={styles.subtitle}>Hourly Forecast</Text>
+          </ImageBackground>
           <FlatList horizontal
             data={forecast.hourly.slice(0, 24)}
             keyExtractor={(item, index) => index.toString()}
@@ -221,8 +260,9 @@ const index = ({ navigation }) => {
             }}
           />
         </View>
-
-        <Text style={styles.subtitle}>Next 5 Days</Text>
+        <ImageBackground source={image} style={styles.image}>
+          <Text style={styles.subtitle}>Next 5 Days</Text>
+        </ImageBackground>
         {forecast.daily.slice(0, 5).map(d => { //Only want the next 5 days
           const weather = d.weather[0];
           var dt = new Date(d.dt * 1000);
@@ -241,6 +281,7 @@ const index = ({ navigation }) => {
           </View>
         })}
       </ScrollView>
+
     </SafeAreaView>
   );
 }
@@ -252,7 +293,7 @@ const styles = StyleSheet.create({
     width: '100%',
     textAlign: 'center',
     fontSize: 42,
-    color: '#e491ff',
+    color: '#373d4a',
     fontWeight: 'bold',
     textTransform: 'uppercase'
   },
@@ -260,30 +301,29 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginVertical: 12,
     marginLeft: 4,
-    color: '#e491ff'
+    color: '#373d4a'
   },
   container: {
     flex: 1,
     flexDirection: 'column',
     justifyContent: 'flex-start',
-    backgroundColor: '#39353b'
+    // backgroundColor: '#373d4a'
   },
   loading: {
     flex: 1,
-    backgroundColor: '#39353b',
+    backgroundColor: '#373d4a',
     alignItems: 'center',
     justifyContent: 'center'
   },
   current: {
     alignItems: 'center',
     alignContent: 'center',
-    backgroundColor: '#913f5a',
     padding: 10
   },
   currentTemp: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#373d4a',
     textAlign: 'center',
   },
   currentDescription: {
@@ -291,8 +331,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '200',
     fontSize: 24,
-    color: '#d18ccc',
-    marginBottom: 24
+    color: '#373d4a',
+    margin: 12
   },
   hour: {
     padding: 6,
@@ -312,36 +352,35 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     alignSelf: 'center',
     fontSize: 20,
-    color: '#d18ccc'
+    color: '#373d4a'
   },
   largeIcon: {
-    width: 250,
+    width: 200,
     height: 100
   },
   smallIcon: {
     width: 100,
     height: 100
   },
-  input:{
+  input: {
     backgroundColor: '#fff',
     margin: 20,
     height: 30,
     padding: 5,
     borderWidth: 1
   },
-  navbar:{
+  navbar: {
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    padding: 10
   },
-  navbutton:{
-    width:'33%',
-  },
-  navbuttonselected:{
-    width:'33%',
-    backgroundColor: '#000'
+  image: {
+    flex: 1,
+    //resizeMode: 'cover',
+    justifyContent: "center"
   }
 });
-
 
 
 export default App;
